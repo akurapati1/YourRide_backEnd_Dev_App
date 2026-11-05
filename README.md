@@ -1,105 +1,73 @@
-# yourRide Application Using SpringBoot
+# YourRide — Cab Booking Backend (Spring Boot)
 
-## Overview
+A production-style **ride-hailing backend** (Uber-like) built with **Spring Boot 3, Spring Security (JWT), PostgreSQL/PostGIS and JPA**. It covers rider/driver onboarding, geospatial driver matching, OTP-verified rides, fare strategies (incl. surge pricing), wallet/cash payments with platform commission, ratings and e-mail notifications.
 
-This project is a back-end application for a ride-hailing service, inspired by Uber's functionalities. Developed using Spring Boot, it provides essential features such as user authentication, ride booking, driver management, and payment processing.
+## Highlights
+- **Stateless auth** – short-lived JWT access tokens + HttpOnly refresh-token cookie; token *type* claims prevent refresh tokens being used as access tokens
+- **Role-based access** – `RIDER`, `DRIVER`, `ADMIN` enforced with `@Secured`
+- **Geospatial matching** – PostGIS (`hibernate-spatial`) finds the 10 nearest / top-rated drivers around the pickup point
+- **Strategy pattern** for pricing (default vs. 2× surge 6–9 PM), driver matching (nearest vs. highest-rated for riders ≥ 4.8★) and payment (wallet vs. cash)
+- **Real road distances** via the OSRM routing API
+- **Ride lifecycle** – request → accept → OTP start → end → payment → mutual ratings
+- Consistent API envelope and global exception handling (404 / 409 / 401 / 403 / 400 validation errors)
+- Swagger UI (springdoc), Actuator, unit + Testcontainers integration tests, GitHub Actions CI
 
-## Features
+## Architecture
+```
+controllers (Auth / Rider / Driver)  →  services (+ strategies)  →  repositories (JPA + PostGIS)  →  PostgreSQL
+              ↑ JwtAuthFilter (Bearer access token)                      ↘ OSRM (distance)  ↘ SMTP (notifications)
+```
+Package layout: `controllers`, `services` / `services.impl`, `strategies`, `entities`, `repositories`, `dto`, `security`, `configs`, `advices` (error handling), `exceptions`, `utils`.
 
-- **User Authentication**: Secure registration and login for riders and drivers.
-- **Ride Booking**: Riders can request rides, view available drivers, and track ride status.
-- **Driver Management**: Drivers can manage their availability, accept ride requests, and view ride history.
-- **Payment Processing**: Integration with payment gateways for seamless transactions.
-- **Ride History**: Both riders and drivers can access their past rides and related details.
-- **Real-Time Notifications**: Updates on ride status, driver arrivals, and more.
+## API
+All responses are wrapped as `{ "timeStamp": …, "data": … }` or `{ "error": … }`. Authenticated routes need `Authorization: Bearer <accessToken>`.
 
-## API Endpoints
+| Method | Path | Role | Description |
+|---|---|---|---|
+| POST | `/auth/signup` | public | Register a rider (creates rider profile + wallet) |
+| POST | `/auth/login` | public | Returns `accessToken`; sets HttpOnly `refreshToken` cookie |
+| POST | `/auth/refresh` | cookie | Issues a new access token from the refresh cookie |
+| POST | `/auth/onBoardNewDriver/{userId}` | ADMIN | Promote a user to driver (`{"vehicleId": "..."}`) |
+| POST | `/riders/requestRide` | RIDER | Request a ride (pickup/drop-off points, payment method) |
+| POST | `/riders/cancelRide/{rideId}` | RIDER | Cancel a confirmed ride |
+| POST | `/riders/rateDriver` | RIDER | `{"rideId": 1, "rating": 5}` after the ride ends |
+| GET | `/riders/getMyProfile` · `/riders/getMyRides` | RIDER | Profile · paginated ride history |
+| POST | `/drivers/acceptRide/{rideRequestId}` | DRIVER | Accept a pending request |
+| POST | `/drivers/startRide/{rideId}` | DRIVER | Start with the rider's OTP (`{"otp": "1234"}`) |
+| POST | `/drivers/endRide/{rideId}` | DRIVER | End ride and process payment |
+| POST | `/drivers/cancelRide/{rideId}` | DRIVER | Cancel a confirmed ride |
+| POST | `/drivers/rateRider` | DRIVER | Rate the rider |
+| GET | `/drivers/getMyProfile` · `/drivers/getMyRides` | DRIVER | Profile · paginated ride history |
 
-### User Endpoints
+Interactive docs: `http://localhost:8080/swagger-ui.html`.
 
-- `POST /api/v1/users/register`: Register a new user.
-- `POST /api/v1/users/login`: Authenticate a user and retrieve a token.
-- `GET /api/v1/users/profile`: Retrieve user profile details.
+## Getting started
+Requirements: **JDK 21**, Maven (or `./mvnw`), Docker (for the database).
 
-### Ride Endpoints
+```bash
+docker compose up -d                       # PostgreSQL + PostGIS
+export DB_PASSWORD=postgres
+export JWT_SECRET="$(openssl rand -base64 48)"
+export SPRING_PROFILES_ACTIVE=dev          # optional: create schema, log SQL
+./mvnw spring-boot:run
+```
+All settings are environment variables — see `.env.example`. **Never commit credentials**; `application.properties` only contains `${…}` placeholders and the app refuses to start without `JWT_SECRET`.
 
-- `POST /api/v1/rides/request`: Request a new ride.
-- `GET /api/v1/rides/{id}`: Get details of a specific ride.
-- `GET /api/v1/rides/history`: Retrieve ride history for a user.
+## Tests
+```bash
+./mvnw test -Dtest='JWTServiceTest,RatingServiceImplTest,StrategiesTest'   # fast unit tests, no Docker
+./mvnw verify                                                              # + Testcontainers integration tests (needs Docker)
+```
 
-### Driver Endpoints
+## Configuration reference
+| Variable | Default | Description |
+|---|---|---|
+| `DB_URL` / `DB_USERNAME` / `DB_PASSWORD` | local Postgres | Database connection |
+| `DDL_AUTO` | `update` | Hibernate schema strategy |
+| `JWT_SECRET` | **required** | HMAC key (≥ 32 chars) |
+| `JWT_ACCESS_MINUTES` / `JWT_REFRESH_DAYS` | `10` / `30` | Token lifetimes |
+| `COOKIE_SECURE` | `false` | Set `true` behind HTTPS |
+| `MAIL_HOST` / `MAIL_PORT` / `MAIL_USERNAME` / `MAIL_PASSWORD` | Gmail SMTP | Notification e-mails |
 
-- `POST /api/v1/drivers/register`: Register a new driver.
-- `POST /api/v1/drivers/login`: Authenticate a driver and retrieve a token.
-- `GET /api/v1/drivers/profile`: Retrieve driver profile details.
-- `POST /api/v1/drivers/availability`: Update driver availability status.
-
-### Payment Endpoints
-
-- `POST /api/v1/payments/charge`: Process a payment for a ride.
-- `GET /api/v1/payments/history`: Retrieve payment history for a user.
-
-## Usage Instructions
-
-1. **Clone the Repository**:
-   ```bash
-   git clone https://github.com/akurapati1/Uber_backEnd_Dev_App.git
-   cd Uber_backEnd_Dev_App
-   ```
-
-2. **Build the Application**:
-   Ensure you have Maven installed. Run:
-   ```bash
-   mvn clean install
-   ```
-
-3. **Configure the Database**:
-   Update the `application.properties` file with your database credentials:
-   ```properties
-   spring.datasource.url=jdbc:mysql://localhost:3306/your_database
-   spring.datasource.username=your_username
-   spring.datasource.password=your_password
-   ```
-
-4. **Run the Application**:
-   ```bash
-   mvn spring-boot:run
-   ```
-   The application will start on `http://localhost:8080`.
-
-5. **Access API Documentation**:
-   Navigate to `http://localhost:8080/swagger-ui.html` to explore the API endpoints and test them.
-
-## Technologies Used
-
-- **Java**: Primary programming language.
-- **Spring Boot**: Framework for building the application.
-- **MySQL**: Relational database management.
-- **Hibernate**: ORM tool for database interactions.
-- **Swagger**: API documentation and testing.
-
-## Contribution Guidelines
-
-1. Fork the repository.
-2. Create a new branch:
-   ```bash
-   git checkout -b feature/your_feature_name
-   ```
-3. Commit your changes:
-   ```bash
-   git commit -m 'Add some feature'
-   ```
-4. Push to the branch:
-   ```bash
-   git push origin feature/your_feature_name
-   ```
-5. Open a pull request.
-
-## License
-
-This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
-
-## Contact
-
-For questions or collaboration, reach out to [your_email@example.com](abhilash.kurapati@slu.edu).
-
+## Known limitations / roadmap
+Wallet top-ups (Stripe/Razorpay) and driver-location update endpoints are not exposed yet; wallet balance is not checked before a wallet-paid ride starts.

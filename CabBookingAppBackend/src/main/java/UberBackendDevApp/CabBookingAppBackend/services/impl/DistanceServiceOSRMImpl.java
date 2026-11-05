@@ -27,7 +27,7 @@ public class DistanceServiceOSRMImpl implements DistanceService {
 
             return responseDto.getRoutes().get(0).getDistance() / 1000.0;
         } catch (Exception e) {
-            throw new RuntimeException("Error getting data from OSRM "+e.getMessage());
+            throw new IllegalStateException("Error getting data from OSRM: " + e.getMessage(), e);
         }
     }
 }

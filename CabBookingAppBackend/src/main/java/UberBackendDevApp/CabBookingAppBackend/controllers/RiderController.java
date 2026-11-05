@@ -20,7 +20,7 @@ public class RiderController {
     private final RiderService riderService;
 
     @PostMapping("/requestRide")
-    public ResponseEntity<RideRequestDto> requestRide(@RequestBody RideRequestDto rideRequestDto) {
+    public ResponseEntity<RideRequestDto> requestRide(@jakarta.validation.Valid @RequestBody RideRequestDto rideRequestDto) {
         return ResponseEntity.ok(riderService.requestRide(rideRequestDto));
     }
 
@@ -30,7 +30,7 @@ public class RiderController {
     }
 
     @PostMapping("/rateDriver")
-    public ResponseEntity<DriverDto> rateDriver(@RequestBody RatingDto ratingDto) {
+    public ResponseEntity<DriverDto> rateDriver(@jakarta.validation.Valid @RequestBody RatingDto ratingDto) {
         return ResponseEntity.ok(riderService.rateDriver(ratingDto.getRideId(), ratingDto.getRating()));
     }
 

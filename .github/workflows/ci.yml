@@ -1,0 +1,11 @@
+name: CI
+on: [push, pull_request]
+jobs:
+  build:
+    runs-on: ubuntu-latest   # Docker is available, so Testcontainers integration tests run too
+    defaults: { run: { working-directory: CabBookingAppBackend } }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: 21, cache: maven }
+      - run: mvn -B verify

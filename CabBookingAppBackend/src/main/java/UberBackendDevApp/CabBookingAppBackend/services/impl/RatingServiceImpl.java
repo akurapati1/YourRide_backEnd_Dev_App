@@ -27,6 +27,7 @@ public class RatingServiceImpl implements RatingService {
 
     @Override
     public DriverDto rateDriver(Ride ride, Integer rating) {
+        validateRating(rating);
         Driver driver = ride.getDriver();
         Rating ratingObj = ratingRepository.findByRide(ride)
                 .orElseThrow(() -> new ResourceNotFoundException("Rating not found for ride with id: "+ride.getId()));
@@ -40,7 +41,9 @@ public class RatingServiceImpl implements RatingService {
 
         Double newRating = ratingRepository.findByDriver(driver)
                 .stream()
-                .mapToDouble(Rating::getDriverRating)
+                .map(Rating::getDriverRating)
+                .filter(java.util.Objects::nonNull)
+                .mapToDouble(Integer::doubleValue)
                 .average().orElse(0.0);
         driver.setRating(newRating);
 
@@ -50,6 +53,7 @@ public class RatingServiceImpl implements RatingService {
 
     @Override
     public RiderDto rateRider(Ride ride, Integer rating) {
+        validateRating(rating);
         Rider rider = ride.getRider();
         Rating ratingObj = ratingRepository.findByRide(ride)
                 .orElseThrow(() -> new ResourceNotFoundException("Rating not found for ride with id: "+ride.getId()));
@@ -62,12 +66,20 @@ public class RatingServiceImpl implements RatingService {
 
         Double newRating = ratingRepository.findByRider(rider)
                 .stream()
-                .mapToDouble(Rating::getRiderRating)
+                .map(Rating::getRiderRating)
+                .filter(java.util.Objects::nonNull)
+                .mapToDouble(Integer::doubleValue)
                 .average().orElse(0.0);
         rider.setRating(newRating);
 
         Rider savedRider = riderRepository.save(rider);
         return modelMapper.map(savedRider, RiderDto.class);
+    }
+
+    private static void validateRating(Integer rating) {
+        if (rating == null || rating < 1 || rating > 5) {
+            throw new RuntimeConflictException("Rating must be between 1 and 5");
+        }
     }
 
     @Override

@@ -13,6 +13,9 @@ import org.springframework.security.authentication.AuthenticationServiceExceptio
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.context.support.HttpRequestHandlerServlet;
 
+import jakarta.validation.Valid;
+import org.springframework.beans.factory.annotation.Value;
+
 import java.util.Arrays;
 
 @RestController
@@ -22,25 +25,35 @@ public class AuthController {
 
     private final AuthService authService;
 
+    @Value("${app.cookie.secure:false}")
+    private boolean secureCookie;
+
+    @Value("${jwt.refreshTokenDays:30}")
+    private int refreshTokenDays;
+
     @PostMapping("/signup")
-    ResponseEntity<UserDto> signUp(@RequestBody SignupDto signupDto) {
+    ResponseEntity<UserDto> signUp(@Valid @RequestBody SignupDto signupDto) {
         return new ResponseEntity<>(authService.signup(signupDto), HttpStatus.CREATED);
     }
 
     @Secured("ROLE_ADMIN")
     @PostMapping("/onBoardNewDriver/{userId}")
-    ResponseEntity<DriverDto> onBoardNewDriver(@PathVariable Long userId, @RequestBody OnboardDriverDto onboardDriverDto) {
+    ResponseEntity<DriverDto> onBoardNewDriver(@PathVariable Long userId, @Valid @RequestBody OnboardDriverDto onboardDriverDto) {
         return new ResponseEntity<>(authService.onboardNewDriver(userId,
                 onboardDriverDto.getVehicleId()), HttpStatus.CREATED);
     }
 
     @PostMapping("/login")
-    ResponseEntity<LoginResponseDto> login(@RequestBody LoginRequestDto loginRequestDto,
+    ResponseEntity<LoginResponseDto> login(@Valid @RequestBody LoginRequestDto loginRequestDto,
                                            HttpServletRequest httpServletRequest, HttpServletResponse httpServletResponse) {
         String tokens[] = authService.login(loginRequestDto.getEmail(), loginRequestDto.getPassword());
 
-        Cookie cookie = new Cookie("token", tokens[1]);
+        // The refresh token travels only in an HttpOnly cookie named "refreshToken" (what /auth/refresh reads).
+        Cookie cookie = new Cookie("refreshToken", tokens[1]);
         cookie.setHttpOnly(true);
+        cookie.setSecure(secureCookie);
+        cookie.setPath("/auth");
+        cookie.setMaxAge(refreshTokenDays * 24 * 60 * 60);
 
         httpServletResponse.addCookie(cookie);
 
@@ -49,7 +62,8 @@ public class AuthController {
 
     @PostMapping("/refresh")
     public ResponseEntity<LoginResponseDto> refresh(HttpServletRequest request) {
-        String refreshToken = Arrays.stream(request.getCookies()).
+        Cookie[] cookies = request.getCookies() == null ? new Cookie[0] : request.getCookies();
+        String refreshToken = Arrays.stream(cookies).
                 filter(cookie -> "refreshToken".equals(cookie.getName()))
                 .findFirst()
                 .map(Cookie::getValue)
