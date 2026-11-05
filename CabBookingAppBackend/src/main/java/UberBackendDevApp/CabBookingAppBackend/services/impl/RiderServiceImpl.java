@@ -1,5 +1,7 @@
 package UberBackendDevApp.CabBookingAppBackend.services.impl;
 
+import UberBackendDevApp.CabBookingAppBackend.exceptions.RuntimeConflictException;
+import org.springframework.security.access.AccessDeniedException;
 import UberBackendDevApp.CabBookingAppBackend.dto.DriverDto;
 import UberBackendDevApp.CabBookingAppBackend.dto.RideDto;
 import UberBackendDevApp.CabBookingAppBackend.dto.RideRequestDto;
@@ -66,11 +68,11 @@ public class RiderServiceImpl implements RiderService {
         Ride ride = rideService.getRideById(rideId);
 
         if(!rider.equals(ride.getRider())) {
-            throw new RuntimeException(("Rider does not own this ride with id: "+rideId));
+            throw new AccessDeniedException(("Rider does not own this ride with id: "+rideId));
         }
 
         if(!ride.getRideStatus().equals(RideStatus.CONFIRMED)) {
-            throw new RuntimeException("Ride cannot be cancelled, invalid status: "+ride.getRideStatus());
+            throw new RuntimeConflictException("Ride cannot be cancelled, invalid status: "+ride.getRideStatus());
         }
 
         Ride savedRide = rideService.updateRideStatus(ride, RideStatus.CANCELLED);
@@ -85,11 +87,11 @@ public class RiderServiceImpl implements RiderService {
         Rider rider = getCurrentRider();
 
         if(!rider.equals(ride.getRider())) {
-            throw new RuntimeException("Rider is not the owner of this Ride");
+            throw new AccessDeniedException("Rider is not the owner of this Ride");
         }
 
         if(!ride.getRideStatus().equals(RideStatus.ENDED)) {
-            throw new RuntimeException("Ride status is not Ended hence cannot start rating, status: "+ride.getRideStatus());
+            throw new RuntimeConflictException("Ride status is not Ended hence cannot start rating, status: "+ride.getRideStatus());
         }
 
         return ratingService.rateDriver(ride, rating);

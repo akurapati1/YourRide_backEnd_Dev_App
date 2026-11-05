@@ -29,6 +29,7 @@ public class WalletServiceImpl implements WalletService {
     @Override
     @Transactional
     public Wallet addMoneyToWallet(User user, Double amount, String transactionId, Ride ride, TransactionMethod transactionMethod) {
+        requirePositive(amount);
         Wallet wallet = findByUser(user);
         wallet.setBalance(wallet.getBalance()+amount);
 
@@ -51,6 +52,7 @@ public class WalletServiceImpl implements WalletService {
     public Wallet deductMoneyFromWallet(User user, Double amount,
                                         String transactionId, Ride ride,
                                         TransactionMethod transactionMethod) {
+        requirePositive(amount);
         Wallet wallet = findByUser(user);
         wallet.setBalance(wallet.getBalance()-amount);
 
@@ -68,6 +70,12 @@ public class WalletServiceImpl implements WalletService {
 //        wallet.getTransactions().add(walletTransaction);
 
         return walletRepository.save(wallet);
+    }
+
+    private static void requirePositive(Double amount) {
+        if (amount == null || amount <= 0) {
+            throw new IllegalArgumentException("Amount must be positive");
+        }
     }
 
     @Override
