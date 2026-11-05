@@ -1,0 +1,27 @@
+# Render Blueprint - free tier. Deploy: https://render.com/deploy?repo=https://github.com/akurapati1/YourRide_backEnd_Dev_App
+# Needs a free PostgreSQL database WITH PostGIS: create one at https://neon.tech (PostGIS is built in), then run once:  CREATE EXTENSION IF NOT EXISTS postgis;
+services:
+  - type: web
+    name: yourride-backend
+    runtime: docker
+    plan: free
+    rootDir: CabBookingAppBackend
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /actuator/health
+    envVars:
+      - key: DB_URL             # jdbc:postgresql://<neon-host>/<db>?sslmode=require
+        sync: false
+      - key: DB_USERNAME
+        sync: false
+      - key: DB_PASSWORD
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+      - key: DDL_AUTO
+        value: update
+      - key: COOKIE_SECURE
+        value: "true"
+      - key: MAIL_USERNAME      # optional (ride notification e-mails)
+        sync: false
+      - key: MAIL_PASSWORD
+        sync: false

@@ -18,7 +18,11 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 public class WebSecurityConfig {
 
     private final JwtAuthFilter jwtAuthFilter;
-    private static final String[] PUBLIC_ROUTES= {"/auth/**"};
+    // Auth endpoints, the liveness probe used by hosting platforms, and the API docs are public.
+    private static final String[] PUBLIC_ROUTES = {
+            "/auth/**", "/actuator/health", "/actuator/health/**",
+            "/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html"
+    };
 
     @Bean
     SecurityFilterChain securityFilterChain(HttpSecurity httpSecurity) throws Exception {
